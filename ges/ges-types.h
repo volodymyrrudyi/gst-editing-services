@@ -146,6 +146,9 @@ typedef struct _GESMaterialClass GESMaterialClass;
 typedef struct _GESMaterialFileSource GESMaterialFileSource;
 typedef struct _GESMaterialFileSourceClass GESMaterialFileSourceClass;
 
+typedef struct _GESProject GESProject;
+typedef struct _GESProjectClass GESProjectClass;
+
 typedef struct _GESExtractable GESExtractable;
 typedef struct _GESExtractableInterface GESExtractableInterface;
 
