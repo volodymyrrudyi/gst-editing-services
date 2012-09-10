@@ -40,7 +40,8 @@ check_PROGRAMS = \
 	ges/transition	\
 	ges/overlays\
 	ges/text_properties\
-	ges/save_and_load
+	ges/save_and_load\
+	ges/material
 
 noinst_LTLIBRARIES=$(testutils_noisnt_libraries)
 noinst_HEADERS=$(testutils_noinst_headers)
