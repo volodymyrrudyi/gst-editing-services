@@ -69,4 +69,19 @@ ges_material_cache_set_loaded(const gchar * id, GError *error);
 GESMaterial*
 ges_material_cache_lookup(const gchar * id);
 
+/* GESExtractable internall methods
+ *
+ * FIXME Check if that should be public later
+ */
+GType
+ges_extractable_type_get_material_type           (GType type);
+gchar *
+ges_extractable_type_check_id                    (GType type, const gchar *id);
+
+GParameter *
+ges_extractable_type_get_parameters_from_id      (GType type, const gchar *id,
+                                                  guint *n_params);
+GType
+ges_extractable_get_real_extractable_type_for_id (GType type, const gchar * id);
+
 #endif /* __GES_INTERNAL_H__ */
