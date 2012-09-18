@@ -910,6 +910,7 @@ ges_material_get_id
 ges_material_new
 ges_material_new_simple
 ges_material_extract
+ges_material_custom_timeline_source_new
 <SUBSECTION Standard>
 GES_MATERIAL
 GES_MATERIAL_CLASS
