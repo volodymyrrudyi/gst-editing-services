@@ -22,9 +22,11 @@
  * SECTION:ges-timeline-test-source
  * @short_description: Render video and audio test patterns in a
  * #GESTimelineLayer
- * 
- * Useful for testing purposes or for filling gaps between media in
- * a #GESTimelineLayer.
+ *
+ * Useful for testing purposes.
+ *
+ * You can use the ges_material_new_simple API to create a Material
+ * capable of extractinf GESTimelineTestSource-s
  */
 
 #include "ges-internal.h"
