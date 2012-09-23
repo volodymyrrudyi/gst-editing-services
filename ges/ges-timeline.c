@@ -37,6 +37,7 @@
  */
 
 #include "ges-internal.h"
+#include "ges-project.h"
 #include "ges-timeline.h"
 #include "ges-track.h"
 #include "ges-timeline-layer.h"
@@ -45,8 +46,12 @@
 typedef struct _MoveContext MoveContext;
 
 static inline void init_movecontext (MoveContext * mv_ctx);
+static void ges_extractable_interface_init (GESExtractableInterface * iface);
 
-G_DEFINE_TYPE (GESTimeline, ges_timeline, GST_TYPE_BIN);
+G_DEFINE_TYPE_WITH_CODE (GESTimeline, ges_timeline, GST_TYPE_BIN,
+    G_IMPLEMENT_INTERFACE (GES_TYPE_EXTRACTABLE,
+        ges_extractable_interface_init));
+
 
 GST_DEBUG_CATEGORY_STATIC (ges_timeline_debug);
 #undef GST_CAT_DEFAULT
@@ -160,6 +165,32 @@ static GstBinClass *parent_class;
 static guint ges_timeline_signals[LAST_SIGNAL] = { 0 };
 
 static gint custom_find_track (TrackPrivate * tr_priv, GESTrack * track);
+
+/* GESExtractable implementation */
+static gchar *
+extractable_check_id (GType type, const gchar * id)
+{
+  return g_strdup (id);
+}
+
+static gchar *
+extractable_get_id (GESExtractable * self)
+{
+  GESMaterial *material;
+
+  if (!(material = ges_extractable_get_material (self)))
+    return NULL;
+
+  return g_strdup (ges_material_get_id (material));
+}
+
+static void
+ges_extractable_interface_init (GESExtractableInterface * iface)
+{
+  iface->material_type = GES_TYPE_PROJECT;
+  iface->check_id = (GESExtractableCheckId) extractable_check_id;
+  iface->get_id = extractable_get_id;
+}
 
 /* Internal methods */
 static gboolean
