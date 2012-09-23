@@ -41,6 +41,7 @@ check_PROGRAMS = \
 	ges/overlays\
 	ges/text_properties\
 	ges/save_and_load\
+	ges/project\
 	ges/material
 
 noinst_LTLIBRARIES=$(testutils_noisnt_libraries)
