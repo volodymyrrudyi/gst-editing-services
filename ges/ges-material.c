@@ -23,7 +23,13 @@
  * @short_description: A GESMaterial is an object from which objects can be extracted
  *
  * FIXME: Long description to be written
+ *
+ * TODO Implement ID changes after material construction ie: user the returned
+ * value of GESMaterialCreatedCallback
  */
+
+/* TODO Implement ID changes after material construction */
+
 
 #include <gst/gst.h>
 #include "ges.h"
@@ -91,7 +97,7 @@ ges_material_start_loading_default (GESMaterial * material)
 }
 
 static GESExtractable *
-ges_material_extract_default (GESMaterial * material)
+ges_material_extract_default (GESMaterial * material, GError ** error)
 {
   guint n_params;
   GParameter *params;
@@ -262,13 +268,27 @@ ges_material_cache_append_callback (const gchar * id,
   return result;
 }
 
-static void
+static gchar *
 execute_callback_func (GESMaterialCallbackData * cbdata)
 {
-  gst_object_ref (cbdata->entry->material);
-  cbdata->callback (cbdata->entry->material, cbdata->entry->error,
+  GESMaterial *material;
+
+  gchar *id = g_strdup (cbdata->entry->material->priv->id);
+  gchar *new_id;
+
+  if (cbdata->entry->error)
+    material = NULL;
+  else
+    material = gst_object_ref (cbdata->entry->material);
+
+  new_id = cbdata->callback (material, id, cbdata->entry->error,
       cbdata->user_data);
+
+  if (new_id)
+    return new_id;
+
   g_slice_free (GESMaterialCallbackData, cbdata);
+  return NULL;
 }
 
 gboolean
@@ -276,37 +296,50 @@ ges_material_cache_set_loaded (const gchar * id, GError * error)
 {
   GESMaterialCacheEntry *entry = NULL;
   GESMaterial *material;
-  gboolean loaded = FALSE;
+  GList *callbacks, *tmp;
+
+  gchar *new_id = NULL;
 
   g_static_mutex_lock (&material_cache_lock);
-  entry = ges_material_cache_get_entry (id);
-  if (entry) {
-    GList *callbacks;
-    GST_DEBUG_OBJECT (entry->material, "loaded, calling callback: %s", error
-        ? error->message : "");
-
-    material = entry->material;
-    if (error) {
-      entry->error = error;
-      material->priv->state = MATERIAL_INITIALIZED_WITH_ERROR;
-    } else {
-      entry->error = NULL;
-      material->priv->state = MATERIAL_INITIALIZED;
-    }
-
-    callbacks = entry->callbacks;
-    entry->callbacks = NULL;
+  if ((entry = ges_material_cache_get_entry (id)) == NULL) {
     g_static_mutex_unlock (&material_cache_lock);
 
-    g_list_free_full (callbacks, (GDestroyNotify) execute_callback_func);
-
-    loaded = TRUE;
-  } else {
-    g_static_mutex_unlock (&material_cache_lock);
-    loaded = FALSE;
+    return FALSE;
   }
 
-  return loaded;
+  GST_DEBUG_OBJECT (entry->material, "loaded, calling callback: %s", error
+      ? error->message : "");
+
+  material = entry->material;
+  entry->error = error;
+  if (error) {
+    material->priv->state = MATERIAL_INITIALIZED_WITH_ERROR;
+  } else {
+    material->priv->state = MATERIAL_INITIALIZED;
+  }
+
+  callbacks = entry->callbacks;
+  entry->callbacks = NULL;
+  g_static_mutex_unlock (&material_cache_lock);
+
+  for (tmp = callbacks; tmp; tmp = tmp->next) {
+    new_id = execute_callback_func (((GESMaterialCallbackData *) tmp->data));
+
+    if (new_id) {
+      g_free (new_id);
+      GST_FIXME_OBJECT (material,
+          "Implement ID changes after material construction");
+
+      break;
+    }
+  }
+
+  if (!new_id) {
+    g_list_free (callbacks);
+  } else {
+  }
+
+  return new_id ? TRUE : FALSE;
 }
 
 void
@@ -332,6 +365,8 @@ ges_material_cache_put (GESMaterial * material)
     GST_DEBUG ("%s alerady in cache, not adding it again", material_id);
   }
   g_static_mutex_unlock (&material_cache_lock);
+
+  GST_ERROR ("NB CACHED %i", g_list_length (g_hash_table_get_values (cache)));
 }
 
 /* API implementation */
@@ -350,7 +385,8 @@ ges_material_get_extractable_type (GESMaterial * self)
 }
 
 /**
- * ges_material_new:
+ * ges_material_new_simple:
+ * @material: (transfer full) (out): The newly created material or %NULL
  * @extractable_type: The #GType of the object that can be extracted from the new material.
  * @id: The Identifier or %NULL
  *
@@ -400,13 +436,14 @@ ges_material_new (GESMaterial ** material, GType extractable_type,
   if (callback == NULL)
     GST_INFO ("No callback given");
 
-  if (!id) {
-    GST_DEBUG ("ID is NULL, using the type name as an ID");
-    id = g_type_name (extractable_type);
-  }
-
   extractable_type =
       ges_extractable_get_real_extractable_type_for_id (extractable_type, id);
+
+  if (extractable_type == G_TYPE_NONE) {
+    GST_WARNING ("No way to create a Material for %s", id);
+
+    return GES_MATERIAL_LOADING_ERROR;
+  }
 
   GST_DEBUG ("Creating material with extractable type %s and ID=%s",
       g_type_name (extractable_type), id);
@@ -479,7 +516,7 @@ ges_material_new (GESMaterial ** material, GType extractable_type,
 
       /*  Remove the callbacks */
       g_static_mutex_lock (&material_cache_lock);
-      entry = ges_material_cache_get_entry (id);
+      entry = ges_material_cache_get_entry (real_id);
       for (tmp = entry->callbacks; tmp; tmp = tmp->next)
         g_slice_free (GESMaterialCallbackData, tmp->data);
       g_list_free (entry->callbacks);
@@ -523,6 +560,7 @@ ges_material_get_id (GESMaterial * self)
 /**
  * ges_material_extract:
  * @self: The #GESMaterial to get extract an object from
+ * @error: (allow-none): An error to be set in case something wrong happens or %NULL
  *
  * Extracts a new #GObject from @material. The type of the object is
  * defined by the extractable-type of @material, you can check what
@@ -532,14 +570,14 @@ ges_material_get_id (GESMaterial * self)
  * Returns: (transfer full): A newly created #GESExtractable
  */
 GESExtractable *
-ges_material_extract (GESMaterial * self)
+ges_material_extract (GESMaterial * self, GError ** error)
 {
   GESExtractable *extractable;
 
   g_return_val_if_fail (GES_IS_MATERIAL (self), NULL);
   g_return_val_if_fail (GES_MATERIAL_GET_CLASS (self)->extract, NULL);
 
-  extractable = GES_MATERIAL_GET_CLASS (self)->extract (self);
+  extractable = GES_MATERIAL_GET_CLASS (self)->extract (self, error);
   ges_extractable_set_material (extractable, self);
 
   return extractable;

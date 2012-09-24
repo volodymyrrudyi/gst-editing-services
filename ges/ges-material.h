@@ -43,13 +43,20 @@ G_BEGIN_DECLS
 
 /**
  * GESMaterialCreatedCallback:
- * @material: the #newly created #GESMaterial or %NULL if something went wrong
- * @error: The #GError filled if previsouly provided in the constructor or %NULL
+ * @material: (transfer full): the #newly created #GESMaterial or %NULL if something went wrong
+ * @id: (transfer full): The id of the material
+ * @error: (transfer full): The #GError filled if previsouly provided in the constructor or %NULL
  * @user_data: The user data pointer
  *
- * A function that will be called when a #GESMaterial is ready to be used.
+ * A function that will be called when a #GESMaterial is ready to be used. If an
+ * error happens, @error will be set, and you can update the id of the material
+ * returning the new ID to be used. In this case the same callback will be called
+ * again when the material is loaded with the new id.
  */
-typedef void (*GESMaterialCreatedCallback)(GESMaterial *material, GError *error, gpointer user_data);
+typedef gchar * (*GESMaterialCreatedCallback)(GESMaterial *material,
+                                              gchar *id,
+                                              GError *error,
+                                              gpointer user_data);
 
 typedef struct _GESMaterialPrivate GESMaterialPrivate;
 
@@ -78,7 +85,7 @@ struct _GESMaterialClass
   GObjectClass parent;
 
   GESMaterialLoadingReturn (*start_loading) (GESMaterial *self);
-  GESExtractable* (*extract)(GESMaterial *self);
+  GESExtractable* (*extract)(GESMaterial *self, GError **error);
 
   gpointer _ges_reserved[GES_PADDING];
 };
@@ -100,7 +107,7 @@ const gchar *
 ges_material_get_id                   (GESMaterial* self);
 
 GESExtractable *
-ges_material_extract                  (GESMaterial *self);
-
+ges_material_extract                  (GESMaterial * self,
+                                       GError **error);
 G_END_DECLS
 #endif /* _GES_MATERIAL */
