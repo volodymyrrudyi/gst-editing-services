@@ -22,6 +22,7 @@
  * SECTION:ges-formatter
  * @short_description: Timeline saving and loading.
  *
+ * === FIXME OBSELETE DOCUMENTATION, TO BE UPDATED WITH PROJECT ===
  * The #GESFormatter is the object responsible for loading and/or saving the contents
  * of a #GESTimeline to/from various formats.
  *
@@ -52,7 +53,11 @@
 #include "ges-internal.h"
 #include "ges.h"
 
-G_DEFINE_ABSTRACT_TYPE (GESFormatter, ges_formatter, G_TYPE_OBJECT);
+static void ges_extractable_interface_init (GESExtractableInterface * iface);
+
+G_DEFINE_ABSTRACT_TYPE_WITH_CODE (GESFormatter, ges_formatter, G_TYPE_OBJECT,
+    G_IMPLEMENT_INTERFACE (GES_TYPE_EXTRACTABLE,
+        ges_extractable_interface_init));
 
 struct _GESFormatterPrivate
 {
@@ -83,6 +88,74 @@ enum
 };
 
 static guint ges_formatter_signals[LAST_SIGNAL] = { 0 };
+
+/* Utils */
+static GESFormatterClass *
+ges_formatter_find_for_uri (const gchar * uri)
+{
+  GType *formatters;
+  guint n_formatters, i;
+  GESFormatterClass *class, *ret = NULL;
+
+  formatters = g_type_children (GES_TYPE_FORMATTER, &n_formatters);
+  for (i = 0; i < n_formatters; i++) {
+    class = g_type_class_ref (formatters[i]);
+
+    if (class->can_load_uri (uri, NULL)) {
+      ret = class;
+      break;
+    }
+    g_type_class_unref (class);
+  }
+
+  g_free (formatters);
+
+  return ret;
+}
+
+/* GESExtractable implementation */
+static gchar *
+extractable_check_id (GType type, const gchar * id)
+{
+  if (gst_uri_is_valid (id))
+    return g_strdup (id);
+
+  return NULL;
+}
+
+static gchar *
+extractable_get_id (GESExtractable * self)
+{
+  GESMaterial *material;
+
+  if (!(material = ges_extractable_get_material (self)))
+    return NULL;
+
+  return g_strdup (ges_material_get_id (material));
+}
+
+static GType
+extractable_get_real_extractable_type (GType type, const gchar * id)
+{
+  GType real_type = G_TYPE_NONE;
+  GESFormatterClass *class;
+
+  class = ges_formatter_find_for_uri (id);
+  if (class) {
+    real_type = G_OBJECT_CLASS_TYPE (class);
+    g_type_class_unref (class);
+  }
+
+  return real_type;
+}
+
+static void
+ges_extractable_interface_init (GESExtractableInterface * iface)
+{
+  iface->check_id = (GESExtractableCheckId) extractable_check_id;
+  iface->get_id = extractable_get_id;
+  iface->get_real_extractable_type = extractable_get_real_extractable_type;
+}
 
 static void
 ges_formatter_class_init (GESFormatterClass * klass)
@@ -145,27 +218,6 @@ ges_formatter_dispose (GObject * object)
   g_hash_table_destroy (priv->parent_newparent_table);
 }
 
-static GESFormatterClass *
-ges_formatter_find_for_uri (const gchar * uri)
-{
-  GType *formatters;
-  guint n_formatters, i;
-  GESFormatterClass *class, *ret = NULL;
-
-  formatters = g_type_children (GES_TYPE_FORMATTER, &n_formatters);
-  for (i = 0; i < n_formatters; i++) {
-    class = g_type_class_ref (formatters[i]);
-
-    if (class->can_load_uri (uri, NULL)) {
-      ret = class;
-      break;
-    }
-    g_type_class_unref (class);
-  }
-
-  g_free (formatters);
-
-  return ret;
 }
 
 /**
