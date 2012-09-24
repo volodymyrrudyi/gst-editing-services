@@ -31,6 +31,9 @@
 G_DEFINE_TYPE (GESMaterialFileSource, ges_material_filesource,
     GES_TYPE_MATERIAL);
 
+/* TODO: We should monitor files here, and add some way of reporting changes
+ * to user
+ */
 enum
 {
   PROP_0,
@@ -72,7 +75,6 @@ ges_material_filesource_set_property (GObject * object, guint property_id,
   }
 }
 
-
 /* WARNING Call WITH discoverer_lock taken */
 static inline GstDiscoverer *
 ges_material_filesource_get_discoverer (void)
@@ -113,7 +115,7 @@ ges_material_filesource_start_loading (GESMaterial * material)
 
 
 static GESExtractable *
-ges_material_filesource_extract (GESMaterial * self)
+ges_material_filesource_extract (GESMaterial * self, GError ** error)
 {
   const gchar *uri = ges_material_get_id (self);
 
@@ -191,9 +193,8 @@ ges_material_filesource_set_info (GESMaterialFileSource * self,
   if (stream_list)
     gst_discoverer_stream_info_list_free (stream_list);
 
-  if (priv->is_image == FALSE) {
+  if (priv->is_image == FALSE)
     priv->duration = gst_discoverer_info_get_duration (info);
-  }
   /* else we keep #GST_CLOCK_TIME_NONE */
 
   priv->info = info;
