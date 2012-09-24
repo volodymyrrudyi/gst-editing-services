@@ -60,11 +60,19 @@ struct _GESProjectClass
 };
 
 gboolean
-ges_project_add_material     (GESProject* self, GESMaterial *material);
+ges_project_add_material     (GESProject* self,
+                              GESMaterial *material);
 gboolean
-ges_project_remove_material  (GESProject *self, const gchar *id);
+ges_project_remove_material  (GESProject *self,
+                              GESMaterial * material);
 GList *
-ges_project_list_materials (GESProject * self, GType filter);
+ges_project_list_materials   (GESProject * self,
+                              GType filter);
+gboolean
+ges_project_save             (GESProject * self,
+                              const gchar *uri,
+                              GType formatter_type,
+                              GError **error);
 
 G_END_DECLS
 

@@ -29,16 +29,59 @@ G_DEFINE_TYPE (GESProject, ges_project, GES_TYPE_MATERIAL);
 struct _GESProjectPrivate
 {
   GHashTable *materials;
+  GESMaterial *formatter_material;
 };
 
-/* GESMaterial vmethod implementation */
-static GESMaterialLoadingReturn
-ges_project_start_loading (GESMaterial * material)
+enum
 {
-  if (ges_formatter_can_load_uri (ges_material_get_id (material), NULL))
-    return GES_MATERIAL_LOADING_ASYNC;
+  MATERIAL_ADDED_SIGNAL,
+  MATERIAL_REMOVED_SIGNAL,
+  LAST_SIGNAL
+};
 
-  return GES_MATERIAL_LOADING_OK;
+static guint _signals[LAST_SIGNAL] = { 0 };
+
+/* GESMaterial vmethod implementation */
+static GESExtractable *
+ges_project_extract (GESMaterial * project, GError ** error)
+{
+  GESProjectPrivate *priv = GES_PROJECT (project)->priv;
+  GESTimeline *timeline = ges_timeline_new ();
+  GError *lerr = NULL;
+
+
+  if (ges_material_new_simple (&priv->formatter_material, GES_TYPE_FORMATTER,
+          ges_material_get_id (project)) == GES_MATERIAL_LOADING_OK) {
+    GESFormatter *formatter =
+        GES_FORMATTER (ges_material_extract (priv->formatter_material, &lerr));
+
+    if (lerr) {
+      GST_WARNING_OBJECT (project, "Could not create the formatter: %s",
+          (*error)->message);
+      gst_object_unref (timeline);
+      g_propagate_error (error, lerr);
+
+      return NULL;
+    }
+
+    ges_formatter_set_project (formatter, GES_PROJECT (project));
+    ges_formatter_load_from_uri (formatter, timeline,
+        ges_material_get_id (project), &lerr);
+
+    if (lerr) {
+      GST_WARNING_OBJECT (project, "Could not load the timeline, returning");
+      gst_object_unref (timeline);
+      g_propagate_error (error, lerr);
+
+      return NULL;
+    }
+
+  } else {
+    GST_LOG_OBJECT (project, "No way to load the timeline... returning an "
+        "empty timeline");
+  }
+
+  return GES_EXTRACTABLE (timeline);
 }
 
 /* GObject vmethod implementation */
@@ -60,8 +103,28 @@ ges_project_class_init (GESProjectClass * klass)
 
   g_type_class_add_private (klass, sizeof (GESProjectPrivate));
 
+  /**
+   * GESProject::material-added:
+   * @formatter: the #GESProject
+   * @material: The #GESMaterial that has been added to @project
+   */
+  _signals[MATERIAL_ADDED_SIGNAL] =
+      g_signal_new ("material-added", G_TYPE_FROM_CLASS (klass),
+      G_SIGNAL_RUN_LAST, 0, NULL, NULL, g_cclosure_marshal_generic, G_TYPE_NONE,
+      1, GES_TYPE_MATERIAL);
+
+  /**
+   * GESProject::material-removed:
+   * @formatter: the #GESProject
+   * @material: The #GESMaterial that has been removed from @project
+   */
+  _signals[MATERIAL_REMOVED_SIGNAL] =
+      g_signal_new ("material-removed", G_TYPE_FROM_CLASS (klass),
+      G_SIGNAL_RUN_LAST, 0, NULL, NULL, g_cclosure_marshal_generic, G_TYPE_NONE,
+      1, GES_TYPE_MATERIAL);
+
   object_class->finalize = _finalize;
-  GES_MATERIAL_CLASS (klass)->start_loading = ges_project_start_loading;
+  GES_MATERIAL_CLASS (klass)->extract = ges_project_extract;
 }
 
 static void
@@ -72,6 +135,7 @@ ges_project_init (GESProject * self)
 
   self->priv->materials = g_hash_table_new_full (g_str_hash, g_str_equal,
       g_free, gst_object_unref);
+  self->priv->formatter_material = NULL;
 }
 
 /**
@@ -92,6 +156,8 @@ ges_project_add_material (GESProject * self, GESMaterial * material)
   g_hash_table_insert (self->priv->materials,
       g_strdup (ges_material_get_id (material)), gst_object_ref (material));
 
+  g_signal_emit (self, _signals[MATERIAL_ADDED_SIGNAL], 0, material);
+
   return TRUE;
 }
 
@@ -105,11 +171,18 @@ ges_project_add_material (GESProject * self, GESMaterial * material)
  * Returns: %TRUE if the material could be removed %FALSE otherwise
  */
 gboolean
-ges_project_remove_material (GESProject * self, const gchar * id)
+ges_project_remove_material (GESProject * self, GESMaterial * material)
 {
+  gboolean ret;
+
   g_return_val_if_fail (GES_IS_PROJECT (self), FALSE);
 
-  return g_hash_table_remove (self->priv->materials, (gpointer) id);
+  ret = g_hash_table_remove (self->priv->materials,
+      ges_material_get_id (material));
+
+  g_signal_emit (self, _signals[MATERIAL_REMOVED_SIGNAL], 0, material);
+
+  return ret;
 }
 
 /**
@@ -142,4 +215,11 @@ ges_project_list_materials (GESProject * self, GType filter)
   }
 
   return ret;
+}
+
+gboolean
+ges_project_save (GESProject * self,
+    const gchar * uri, GType formatter_type, GError ** error)
+{
+  return TRUE;
 }
