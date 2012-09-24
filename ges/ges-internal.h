@@ -84,4 +84,10 @@ ges_extractable_type_get_parameters_from_id      (GType type, const gchar *id,
 GType
 ges_extractable_get_real_extractable_type_for_id (GType type, const gchar * id);
 
+/* GESFormatter internal methods */
+void
+ges_formatter_set_project                        (GESFormatter *formatter,
+                                                  GESProject *project);
+GESProject *
+ges_formatter_get_project                        (GESFormatter *formatter);
 #endif /* __GES_INTERNAL_H__ */

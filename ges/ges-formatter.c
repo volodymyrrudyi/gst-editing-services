@@ -68,6 +68,8 @@ struct _GESFormatterPrivate
    * provided the new source URI. */
   GHashTable *uri_newuri_table;
   GHashTable *parent_newparent_table;
+
+  GESProject *project;
 };
 
 static void ges_formatter_dispose (GObject * object);
@@ -77,8 +79,6 @@ static gboolean save_to_uri (GESFormatter * formatter, GESTimeline *
     timeline, const gchar * uri, GError ** error);
 static gboolean default_can_load_uri (const gchar * uri, GError ** error);
 static gboolean default_can_save_uri (const gchar * uri, GError ** error);
-static void discovery_error_cb (GESTimeline * timeline,
-    GESTimelineFileSource * tfs, GError * error, GESFormatter * formatter);
 
 enum
 {
@@ -204,6 +204,7 @@ ges_formatter_init (GESFormatter * object)
       g_str_equal, g_free, g_free);
   object->priv->parent_newparent_table = g_hash_table_new_full (g_file_hash,
       (GEqualFunc) g_file_equal, g_object_unref, g_object_unref);
+  object->priv->project = NULL;
 }
 
 static void
@@ -216,8 +217,8 @@ ges_formatter_dispose (GObject * object)
   }
   g_hash_table_destroy (priv->uri_newuri_table);
   g_hash_table_destroy (priv->parent_newparent_table);
-}
 
+  ges_formatter_set_project (GES_FORMATTER (object), NULL);
 }
 
 /**
@@ -235,6 +236,7 @@ ges_formatter_new_for_uri (const gchar * uri)
 {
   if (ges_formatter_can_load_uri (uri, NULL))
     return GES_FORMATTER (ges_keyfile_formatter_new ());
+
   return NULL;
 }
 
@@ -486,8 +488,6 @@ ges_formatter_load_from_uri (GESFormatter * formatter, GESTimeline * timeline,
   g_return_val_if_fail (GES_IS_FORMATTER (formatter), FALSE);
   g_return_val_if_fail (GES_IS_TIMELINE (timeline), FALSE);
 
-  g_signal_connect (timeline, "discovery-error",
-      G_CALLBACK (discovery_error_cb), formatter);
   if (klass->load_from_uri) {
     ges_timeline_enable_update (timeline, FALSE);
     formatter->timeline = timeline;
@@ -626,53 +626,6 @@ ges_formatter_update_source_uri (GESFormatter * formatter,
   return FALSE;
 }
 
-static void
-discovery_error_cb (GESTimeline * timeline,
-    GESTimelineFileSource * tfs, GError * error, GESFormatter * formatter)
-{
-  if (error->domain == GST_RESOURCE_ERROR &&
-      error->code == GST_RESOURCE_ERROR_NOT_FOUND) {
-    const gchar *uri = ges_timeline_filesource_get_uri (tfs);
-    gchar *new_uri = g_hash_table_lookup (formatter->priv->uri_newuri_table,
-        uri);
-
-    /* We didn't find this exact URI, trying to find its parent new directory */
-    if (!new_uri) {
-      GFile *parent, *file = g_file_new_for_uri (uri);
-
-      /* Check if we have the new parent in cache */
-      parent = g_file_get_parent (file);
-      if (parent) {
-        GFile *new_parent =
-            g_hash_table_lookup (formatter->priv->parent_newparent_table,
-            parent);
-
-        if (new_parent) {
-          gchar *basename = g_file_get_basename (file);
-          GFile *new_file = g_file_get_child (new_parent, basename);
-
-          new_uri = g_file_get_uri (new_file);
-
-          g_object_unref (new_file);
-          g_object_unref (parent);
-          g_free (basename);
-        }
-      }
-
-      g_object_unref (file);
-    }
-
-    if (new_uri) {
-      ges_formatter_update_source_uri (formatter, tfs, new_uri);
-      GST_DEBUG ("%s found in the cache, new uri: %s", uri, new_uri);
-
-    } else {
-      g_signal_emit (formatter, ges_formatter_signals[SOURCE_MOVED_SIGNAL], 0,
-          tfs);
-    }
-  }
-}
-
 /*< protected >*/
 /**
  * ges_formatter_emit_loaded:
@@ -691,4 +644,19 @@ ges_formatter_emit_loaded (GESFormatter * formatter)
       formatter->timeline);
 
   return TRUE;
+}
+
+void
+ges_formatter_set_project (GESFormatter * formatter, GESProject * project)
+{
+  if (formatter->priv->project)
+    g_object_unref (formatter->priv->project);
+
+  formatter->priv->project = g_object_ref (project);
+}
+
+GESProject *
+ges_formatter_get_project (GESFormatter * formatter)
+{
+  return formatter->priv->project;
 }
