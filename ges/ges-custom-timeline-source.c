@@ -257,7 +257,7 @@ ges_material_custom_timeline_source_new (GESFillTrackObjectUserFunc func,
   gchar *id = g_strdup_printf ("%i!%i", GPOINTER_TO_INT (func),
       GPOINTER_TO_INT (user_data));
 
-  ges_material_new (&material, GES_TYPE_CUSTOM_TIMELINE_SOURCE, NULL, id, NULL);
+  ges_material_new_simple (&material, GES_TYPE_CUSTOM_TIMELINE_SOURCE, id);
 
   g_free (id);
 
