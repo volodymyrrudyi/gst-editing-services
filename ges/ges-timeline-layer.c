@@ -690,14 +690,21 @@ start_calculating_transitions (GESTimelineLayer * layer)
 }
 
 static void
-new_material_cb (GESMaterial * material, GError * error,
+new_material_cb (GESMaterial * material, gchar * id, GError * error,
     NewMaterialUData * udata)
 {
   GST_DEBUG_OBJECT (udata->layer, "%" GST_PTR_FORMAT " Material loaded, "
       "setting its material", udata->object);
 
-  ges_extractable_set_material (GES_EXTRACTABLE (udata->object), material);
-  ges_timeline_layer_add_object (udata->layer, udata->object);
+  if (error) {
+    GST_WARNING ("Material could not be created for uri %s", id);
+  } else {
+    ges_extractable_set_material (GES_EXTRACTABLE (udata->object), material);
+    ges_timeline_layer_add_object (udata->layer, udata->object);
+  }
+
+  g_free (id);
+  g_object_unref (material);
   g_slice_free (NewMaterialUData, udata);
 }
 
@@ -1027,7 +1034,7 @@ ges_timeline_layer_add_material (GESTimelineLayer * layer,
           (material), GES_TYPE_TIMELINE_OBJECT), NULL);
 
 
-  tlobj = GES_TIMELINE_OBJECT (ges_material_extract (material));
+  tlobj = GES_TIMELINE_OBJECT (ges_material_extract (material, NULL));
   ges_timeline_object_set_start (tlobj, start);
   ges_timeline_object_set_inpoint (tlobj, inpoint);
   if (GST_CLOCK_TIME_IS_VALID (duration)) {
