@@ -27,7 +27,8 @@ bus_message_cb (GstBus * bus, GstMessage * message, GMainLoop * mainloop);
 
 static GstEncodingProfile *make_profile_from_info (GstDiscovererInfo * info);
 
-static void material_loaded_cb (GESMaterial * material, gboolean loaded);
+static void material_loaded_cb (GESMaterial * material, gchar * id,
+    GError * error, gpointer udata);
 
 GESTimelinePipeline *pipeline = NULL;
 gchar *output_uri = NULL;
@@ -94,7 +95,8 @@ main (int argc, char **argv)
 }
 
 static void
-material_loaded_cb (GESMaterial * material, gboolean loaded)
+material_loaded_cb (GESMaterial * material, gchar * id, GError * error,
+    gpointer udata)
 {
   GESMaterialFileSource *mfs = GES_MATERIAL_FILESOURCE (material);
   g_static_mutex_lock (&materialsLoadedLock);
@@ -110,6 +112,9 @@ material_loaded_cb (GESMaterial * material, gboolean loaded)
     ges_timeline_pipeline_set_render_settings (pipeline, output_uri, profile);
     gst_element_set_state (GST_ELEMENT (pipeline), GST_STATE_PLAYING);
   }
+
+  g_free (id);
+  g_object_unref (material);
 }
 
 static void
