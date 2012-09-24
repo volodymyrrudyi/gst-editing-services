@@ -154,7 +154,6 @@ enum
   TRACK_REMOVED,
   LAYER_ADDED,
   LAYER_REMOVED,
-  DISCOVERY_ERROR,
   SNAPING_STARTED,
   SNAPING_ENDED,
   LAST_SIGNAL
@@ -166,11 +165,22 @@ static guint ges_timeline_signals[LAST_SIGNAL] = { 0 };
 
 static gint custom_find_track (TrackPrivate * tr_priv, GESTrack * track);
 
+static guint nb_materials = 0;
+
 /* GESExtractable implementation */
 static gchar *
 extractable_check_id (GType type, const gchar * id)
 {
-  return g_strdup (id);
+  gchar *res;
+
+  if (id == NULL)
+    res = g_strdup_printf ("%s-%i", "project", nb_materials);
+  else
+    res = g_strdup (id);
+
+  nb_materials++;
+
+  return res;
 }
 
 static gchar *
@@ -297,6 +307,9 @@ ges_timeline_class_init (GESTimelineClass * klass)
 
   g_type_class_add_private (klass, sizeof (GESTimelinePrivate));
 
+  GST_DEBUG_CATEGORY_INIT (ges_timeline_debug, "gestimeline",
+      GST_DEBUG_FG_YELLOW, "ges timeline");
+
   parent_class = g_type_class_peek_parent (klass);
 
   object_class->get_property = ges_timeline_get_property;
@@ -401,19 +414,6 @@ ges_timeline_class_init (GESTimelineClass * klass)
       GES_TYPE_TIMELINE_LAYER);
 
   /**
-   * GESTimeline::discovery-error:
-   * @timeline: the #GESTimeline
-   * @formatter: the #GESFormatter
-   * @source: The #GESTimelineFileSource that could not be discovered properly
-   * @error: (type GLib.Error): #GError, which will be non-NULL if an error
-   *                            occurred during discovery
-   */
-  ges_timeline_signals[DISCOVERY_ERROR] =
-      g_signal_new ("discovery-error", G_TYPE_FROM_CLASS (klass),
-      G_SIGNAL_RUN_FIRST, 0, NULL, NULL, g_cclosure_marshal_generic,
-      G_TYPE_NONE, 2, GES_TYPE_TIMELINE_FILE_SOURCE, G_TYPE_ERROR);
-
-  /**
    * GESTimeline::track-objects-snapping:
    * @timeline: the #GESTimeline
    * @obj1: the first #GESTrackObject that was snapping.
@@ -452,9 +452,6 @@ static void
 ges_timeline_init (GESTimeline * self)
 {
   GESTimelinePrivate *priv;
-
-  GST_DEBUG_CATEGORY_INIT (ges_timeline_debug, "gestimeline",
-      GST_DEBUG_FG_YELLOW, "ges timeline");
 
   self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
       GES_TYPE_TIMELINE, GESTimelinePrivate);
