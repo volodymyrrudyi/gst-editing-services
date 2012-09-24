@@ -29,7 +29,7 @@ static gchar *av_uri;
 GMainLoop *mainloop;
 
 static void
-material_created_cb (GESMaterial * material, GError * error,
+material_created_cb (GESMaterial * material, gchar * id, GError * error,
     GESTimelineLayer * layer)
 {
   GList *tracks, *tmp;
@@ -38,6 +38,7 @@ material_created_cb (GESMaterial * material, GError * error,
   fail_unless (error == NULL);
   fail_if (material == NULL);
   fail_if (g_strcmp0 (ges_material_get_id (material), av_uri));
+  fail_if (g_strcmp0 (id, av_uri));
 
   tlfs = GES_TIMELINE_FILE_SOURCE (ges_timeline_layer_add_material (layer,
           material, 0, 0, GST_CLOCK_TIME_NONE, 1, GES_TRACK_TYPE_UNKNOWN));
@@ -60,6 +61,7 @@ material_created_cb (GESMaterial * material, GError * error,
   }
   g_list_free_full (tracks, gst_object_unref);
 
+  g_free (id);
   gst_object_unref (material);
   g_main_loop_quit (mainloop);
 }
