@@ -237,6 +237,7 @@ ges_extractable_type_check_id (GType type, const gchar * id)
 GType
 ges_extractable_get_real_extractable_type_for_id (GType type, const gchar * id)
 {
+  GType ret;
   GObjectClass *klass;
   GESExtractableInterface *iface;
 
@@ -244,5 +245,10 @@ ges_extractable_get_real_extractable_type_for_id (GType type, const gchar * id)
   iface = g_type_interface_peek (klass, GES_TYPE_EXTRACTABLE);
   g_type_class_unref (klass);
 
-  return iface->get_real_extractable_type (type, id);
+  ret = iface->get_real_extractable_type (type, id);
+
+  GST_DEBUG ("Extractable type for id %s and wanted type %s is: %s",
+      id, g_type_name (type), g_type_name (ret));
+
+  return ret;
 }
