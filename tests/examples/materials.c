@@ -24,7 +24,8 @@
 #include <ges/ges-internal.h>
 
 static void
-material_loaded_cb (GESMaterial * material, gboolean loaded)
+material_loaded_cb (GESMaterial * material, gchar * id, GError * error,
+    gpointer udata)
 {
   GESMaterialFileSource *mfs = GES_MATERIAL_FILESOURCE (material);
   GstDiscovererInfo *discoverer_info = NULL;
@@ -34,6 +35,9 @@ material_loaded_cb (GESMaterial * material, gboolean loaded)
   GST_DEBUG ("Info type is %s", G_OBJECT_TYPE_NAME (mfs));
   GST_DEBUG ("Duration is %" GST_TIME_FORMAT,
       GST_TIME_ARGS (ges_material_filesource_get_duration (mfs)));
+
+  g_free (id);
+  g_object_unref (material);
 }
 
 int
