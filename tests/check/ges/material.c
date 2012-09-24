@@ -21,16 +21,20 @@
 #include <ges/ges.h>
 #include <gst/check/gstcheck.h>
 
-GMainLoop *mainloop;
-static void
-source_material_created (GESMaterial * material, GError * error,
-    gpointer user_data)
+static GMainLoop *mainloop;
+
+static gchar *
+source_material_created (GESMaterial * material, gchar * id,
+    GError * error, gpointer user_data)
 {
-  fail_unless (GES_IS_MATERIAL (material));
+  fail_unless (material == NULL);
   assert_equals_int (error->domain, GST_RESOURCE_ERROR);
 
-  gst_object_unref (material);
+  g_free (id);
+  /* material is NULL, otherwize we should unref it */
   g_main_loop_quit (mainloop);
+
+  return NULL;
 }
 
 GST_START_TEST (test_basic)
@@ -45,7 +49,6 @@ GST_START_TEST (test_basic)
           NULL) == GES_MATERIAL_LOADING_ASYNC);
 
   g_main_loop_run (mainloop);
-
   g_main_loop_unref (mainloop);
 }
 
